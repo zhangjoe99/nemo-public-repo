@@ -15,32 +15,37 @@ class DiarizationService():
 
     def call_nemo(self, input_file_url):
         with self.download_service.download(input_file_url) as vocal_target:
-            vocals = AudioSegment.from_wav(vocal_target)
+            audio = AudioSegment.from_wav(vocal_target)
+            chunk_length_ms = 60000  # 1 minute
+            chunks = [audio[i:i+chunk_length_ms] for i in range(0, len(audio), chunk_length_ms)]
 
-            # Convert vocals audio to mono
-            signal, sample_rate = librosa.load(vocal_target, sr=None)
-            soundfile.write("mono_file.wav", signal, sample_rate, "PCM_24")
-            output_E_ConverAudio = AudioSegment.from_wav("./mono_file.wav")
+            all_speaker_ts = []
+            for idx, chunk in enumerate(chunks):
+                chunk.export(f"chunk_{idx}.wav", format="wav")
+                # Process each chunk as before
+                signal, sample_rate = librosa.load(f"chunk_{idx}.wav", sr=None)
+                soundfile.write(f"mono_chunk_{idx}.wav", signal, sample_rate, "PCM_24")
+                
+                _config = self.create_nemo_config(f"mono_chunk_{idx}.wav")
+                model = NeuralDiarizer(cfg=_config)
+                model.diarize()
 
-            # Run Nemo
-            _config = self.create_nemo_config()
-            model = NeuralDiarizer(cfg=_config)
-            model.diarize()
-
-            output_dir = "nemo_outputs"
-            speaker_ts = []
-            with open(f"{output_dir}/pred_rttms/mono_file.rttm", "r") as f:
-                lines = f.readlines()
-                for line in lines:
-                    line_list = line.split(" ")
-                    s = int(float(line_list[5]) * 1000)
-                    e = s + int(float(line_list[8]) * 1000)
-                    speaker_ts.append([s, e, int(line_list[11].split("_")[-1])])
+                output_dir = "nemo_outputs"
+                speaker_ts = []
+                with open(f"{output_dir}/pred_rttms/mono_chunk_{idx}.rttm", "r") as f:
+                    lines = f.readlines()
+                    for line in lines:
+                        line_list = line.split(" ")
+                        s = int(float(line_list[5]) * 1000) + idx * chunk_length_ms
+                        e = s + int(float(line_list[8]) * 1000)
+                        speaker_ts.append([s, e, int(line_list[11].split("_")[-1])])
+                
+                all_speaker_ts.extend(speaker_ts)
 
             # Open a file for writing
             file_name = 'nemo_results.json'
             with open(file_name, 'w') as f:
-                json.dump(speaker_ts, f)
+                json.dump(all_speaker_ts, f)
 
             return file_name
 
