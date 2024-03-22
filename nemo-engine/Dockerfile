@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install build-essential -y && apt-get install -y -
 
 RUN pip install Cython
 RUN pip install megatron-core==0.3.0
-RUN pip install git+https://github.com/NVIDIA/NeMo.git@r1.22.0#egg=nemo_toolkit[asr]
-# RUN pip install git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_toolkit[all]
+# RUN pip install git+https://github.com/NVIDIA/NeMo.git@r1.22.0#egg=nemo_toolkit[asr]
+RUN pip install git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_toolkit[all]
 RUN pip install -r requirements.txt
 
 # Copy the current directory contents into the container at /app
